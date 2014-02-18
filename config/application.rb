@@ -1,6 +1,7 @@
 require File.expand_path('../boot', __FILE__)
 
 require 'rails/all'
+require 'net/http'
 
 if defined?(Bundler)
   # If you precompile assets before deploying to production, use this line
@@ -15,12 +16,17 @@ module BPSF
     # Application configuration should go into files in config/initializers
     # -- all .rb files in that directory are automatically loaded.
 
-    # Custom directories with classes and modules you want to be autoloadable.
-    # config.autoload_paths += %W(#{config.root}/extras)
+    # Autoreload lib/ and concerns folder
+    config.autoload_paths += Dir["#{config.root}/lib/**/"]
+    config.autoload_paths += %W(#{config.root}/app/models/concerns)
 
     # Only load the plugins named here, in the order given (default is alphabetical).
     # :all can be used as a placeholder for all plugins not explicitly named.
     # config.plugins = [ :exception_notification, :ssl_requirement, :all ]
+
+    # Use SSL
+    config.use_ssl = false
+    config.force_ssl = false
 
     # Activate observers that should always be running.
     # config.active_record.observers = :cacher, :garbage_collector, :forum_observer
@@ -59,6 +65,13 @@ module BPSF
     # Version of your assets, change this if you want to expire all your assets
     config.assets.version = '1.0'
 
+    # Config the local_env.yml
+    config.before_configuration do
+      env_file = File.join(Rails.root, 'config', 'local_env.yml')
+      YAML.load(File.open(env_file)).each do |key, value|
+        ENV[key.to_s] = value
+      end if File.exists?(env_file)
+    end
     config.assets.initialize_on_precompile = false
   end
 end

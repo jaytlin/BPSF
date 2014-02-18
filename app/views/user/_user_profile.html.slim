@@ -1,0 +1,10 @@
+.row
+  - if profile.address
+    h5 Address:
+    .row= profile.address
+    .row
+      = "#{profile.city} #{profile.zipcode}"
+.row
+  - if profile.phone
+    h5 Phone:
+    = profile.phone

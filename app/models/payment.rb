@@ -16,11 +16,18 @@ class Payment < ActiveRecord::Base
   belongs_to :user
   belongs_to :crowdfund
 
+  validates :amount, numericality: {greater_than: 0}
+
   def self.make_payment!(amount, grant, current_user)
     payment = current_user.payments.build amount: amount
     payment.user_id = current_user.id
     payment.crowdfund_id = grant.crowdfunder.id
-    payment.save!
-    UserMailer.user_pledge(current_user,grant).deliver
+    payment.crowdfund.add_payment payment.amount
+    UserPledgeJob.new.async.perform(current_user,grant)
+    payment
+  end
+
+  def dollars_amount
+    "$%05.2f" % self.amount
   end
 end

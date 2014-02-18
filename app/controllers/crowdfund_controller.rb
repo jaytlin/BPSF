@@ -1,17 +1,34 @@
+# Controller for the Crowdfund model
 class CrowdfundController < ApplicationController
   def create
-    date = params[:date]
-    time = Time.new date[:year], date[:month], date[:day]
-    c = Crowdfund.create deadline: time,
-                         goal: params[:goal],
-                         pledged_total: 0
-    c.grant_id = params[:grant_id]
-    if c.save
-      flash[:success] = "Crowfund started!"
-    end
+    date = get_date_from_params
     @grant = Grant.find params[:grant_id]
-    @grant.state = "crowdfunding"
-    @grant.save
+    @grant.create_crowdfunder goal: params[:goal],
+                              pledged_total: 0
+    @grant.deadline = date
+    flash[:success] = "Crowdfund started!"
+    @grant.crowdfund
     redirect_to @grant
   end
+
+  def update
+    crowdfund = Crowdfund.find params[:crowdfund_id]
+    new_deadline = get_date_from_params
+    if crowdfund.grant.update_attributes deadline: new_deadline
+      flash[:success] = 'Deadline changed!'
+    else
+      flash[:error] = "Deadline can't be before today"
+    end
+    redirect_to crowdfund.grant
+  end
+
+  def use_https?
+    true
+  end
+
+  private
+    def get_date_from_params
+      date = params[:date]
+      Time.new date[:year], date[:month], date[:day]
+    end
 end

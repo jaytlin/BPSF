@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20131119074147) do
+ActiveRecord::Schema.define(:version => 20140214053822) do
 
   create_table "admin_profiles", :force => true do |t|
     t.string   "about"
@@ -22,14 +22,18 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.integer  "super_user_id"
   end
 
+  add_index "admin_profiles", ["admin_id"], :name => "index_admin_profiles_on_admin_id"
+  add_index "admin_profiles", ["super_user_id"], :name => "index_admin_profiles_on_super_user_id"
+
   create_table "crowdfunds", :force => true do |t|
-    t.datetime "deadline"
     t.datetime "created_at",    :null => false
     t.datetime "updated_at",    :null => false
     t.integer  "goal"
     t.integer  "pledged_total"
     t.integer  "grant_id"
   end
+
+  add_index "crowdfunds", ["grant_id"], :name => "index_crowdfunds_on_grant_id"
 
   create_table "draft_grants", :force => true do |t|
     t.integer  "recipient_id"
@@ -53,11 +57,13 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.datetime "created_at",         :null => false
     t.datetime "updated_at",         :null => false
     t.string   "video"
-    t.string   "image_url"
+    t.string   "image"
     t.integer  "school_id"
     t.string   "type"
+    t.integer  "grant_id"
   end
 
+  add_index "draft_grants", ["grant_id"], :name => "index_draft_grants_on_grant_id"
   add_index "draft_grants", ["recipient_id"], :name => "index_draft_grants_on_recipient_id"
   add_index "draft_grants", ["school_id"], :name => "index_draft_grants_on_school_id"
 
@@ -84,9 +90,13 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.integer  "recipient_id"
     t.string   "state"
     t.string   "video"
-    t.string   "image_url"
+    t.string   "image"
     t.integer  "school_id"
     t.decimal  "rating_average",     :precision => 6, :scale => 2, :default => 0.0
+    t.string   "school_name"
+    t.string   "teacher_name"
+    t.string   "type"
+    t.date     "deadline"
   end
 
   add_index "grants", ["recipient_id"], :name => "index_grants_on_recipient_id"
@@ -127,7 +137,14 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.datetime "started_teaching"
     t.string   "subject"
     t.string   "grade"
+    t.string   "address"
+    t.string   "city"
+    t.integer  "zipcode"
+    t.string   "work_phone"
+    t.string   "home_phone"
   end
+
+  add_index "recipient_profiles", ["school_id"], :name => "index_recipient_profiles_on_school_id"
 
   create_table "schools", :force => true do |t|
     t.string   "name"
@@ -135,6 +152,28 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.datetime "created_at",         :null => false
     t.datetime "updated_at",         :null => false
   end
+
+  create_table "simple_captcha_data", :force => true do |t|
+    t.string   "key",        :limit => 40
+    t.string   "value",      :limit => 6
+    t.datetime "created_at",               :null => false
+    t.datetime "updated_at",               :null => false
+  end
+
+  add_index "simple_captcha_data", ["key"], :name => "idx_key"
+
+  create_table "user_profiles", :force => true do |t|
+    t.text     "address"
+    t.text     "city"
+    t.integer  "zipcode"
+    t.text     "phone"
+    t.text     "relationship"
+    t.integer  "user_id"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+  end
+
+  add_index "user_profiles", ["user_id"], :name => "index_user_profiles_on_user_id"
 
   create_table "users", :force => true do |t|
     t.string   "email",                  :default => "", :null => false
@@ -153,9 +192,21 @@ ActiveRecord::Schema.define(:version => 20131119074147) do
     t.string   "first_name"
     t.string   "last_name"
     t.string   "stripe_token"
+    t.boolean  "approved"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true
   add_index "users", ["reset_password_token"], :name => "index_users_on_reset_password_token", :unique => true
+
+  create_table "versions", :force => true do |t|
+    t.string   "item_type",  :null => false
+    t.integer  "item_id",    :null => false
+    t.string   "event",      :null => false
+    t.string   "whodunnit"
+    t.text     "object"
+    t.datetime "created_at"
+  end
+
+  add_index "versions", ["item_type", "item_id"], :name => "index_versions_on_item_type_and_item_id"
 
 end

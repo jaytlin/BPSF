@@ -9,6 +9,10 @@ BPSF::Application.configure do
   # Log error messages when you accidentally call methods on nil.
   config.whiny_nils = true
 
+  # Use ssl
+  config.use_ssl = false
+  # config.ssl_port = 3001
+
   # Show full error reports and disable caching
   config.consider_all_requests_local       = true
   config.action_controller.perform_caching = false
@@ -44,4 +48,11 @@ BPSF::Application.configure do
 
   # Debugger level
   config.log_level = :warn
+
+  config.after_initialize do
+    Bullet.enable = true
+    Bullet.bullet_logger = true
+    Bullet.rails_logger = true
+    #Bullet.add_footer = true
+  end
 end

@@ -19,6 +19,7 @@
 #  first_name             :string(255)
 #  last_name              :string(255)
 #  stripe_token           :string(255)
+#  approved               :boolean
 #
 
 class User < ActiveRecord::Base
@@ -26,16 +27,31 @@ class User < ActiveRecord::Base
          :recoverable, :rememberable, :trackable, :validatable
 
   attr_accessible :first_name, :last_name, :email, :password,
-                  :password_confirmation, :remember_me, :type
+                  :password_confirmation, :remember_me, :type,
+                  :approved, :profile_attributes
 
   has_many :payments, dependent: :destroy
+  has_one :profile, class_name: 'UserProfile'
+  accepts_nested_attributes_for :profile
+
+  scope :donors, -> { where type: nil }
 
   def name
     return "#{first_name} #{last_name}"
   end
 
-  def self.donors
-    where 'type is null'
+  def init_approved
+    true
   end
-  
+
+  def default_card
+    if self.stripe_token
+      customer = Stripe::Customer.retrieve(self.stripe_token)
+      customer.cards.retrieve(customer[:default_card])
+    end
+  end
+
+  def last4
+    default_card[:last4] if default_card
+  end
 end

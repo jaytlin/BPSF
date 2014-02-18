@@ -1,9 +1,10 @@
 # == Schema Information
 #
-# Table name: draft_grants
+# Table name: grants
 #
 #  id                 :integer          not null, primary key
-#  recipient_id       :integer
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
 #  title              :text
 #  summary            :text
 #  subject_areas      :text
@@ -21,70 +22,65 @@
 #  n_collaborators    :integer
 #  collaborators      :text
 #  comments           :text
-#  created_at         :datetime         not null
-#  updated_at         :datetime         not null
+#  recipient_id       :integer
+#  state              :string(255)
 #  video              :string(255)
-#  image_url          :string(255)
+#  image              :string(255)
 #  school_id          :integer
+#  rating_average     :decimal(6, 2)    default(0.0)
+#  school_name        :string(255)
+#  teacher_name       :string(255)
 #  type               :string(255)
 #
 
-class ValidGradeValidator < ActiveModel::EachValidator
-  def validate_each(object, attribute, value)
-    return if not value
-    nums = value.split(/,\s*|-/)
-    unless nums.all? { |num| num =~ /^([K1-9]|1[0-2])$/ }
-      object.errors[attribute] << (options[:message] || "is not formatted properly")
-    end
-  end
-end
-
-class DraftGrant < ActiveRecord::Base
-  extend Enumerize
-  SUBJECTS = ['Art & Music', 'Supplies', 'Reading', 'Science & Math', 'Field Trips', 'Other']
-  enumerize :subject_areas, in: SUBJECTS, multiple: true
-  serialize :subject_areas, Array
-
-  attr_accessible :title, :summary, :subject_areas, :grade_level, :duration,
-                  :num_classes, :num_students, :total_budget, :requested_funds,
-                  :funds_will_pay_for, :budget_desc, :purpose, :methods,
-                  :background, :n_collaborators, :collaborators, :comments,
-                  :video, :image_url
-  belongs_to :recipient
-  belongs_to :school
-
-  before_validation do |grant|
-    grant.subject_areas = grant.subject_areas.to_a.reject(&:empty?)
-  end
-
+class DraftGrant < Grant
   validates :title, presence: true, length: { maximum: 40 }
-  validates_presence_of :recipient_id, if: 'type.nil?'
-  validates_length_of :summary, within: 1..200, too_short: 'cannot be blank', allow_nil: true
-  validates_length_of :duration, :budget_desc,
-                      minimum: 1, too_short: 'cannot be blank', allow_nil: true
-  validates :grade_level, valid_grade: true, allow_nil: true
-  validates_length_of :purpose, :methods, :background, :collaborators, :comments,
-                      within: 1..1200, too_short: 'cannot be blank', allow_nil: true
+  validates :recipient_id, :school_id, presence: true, if: 'type.nil?'
+  validates :summary, length: { maximum: 200 }
+  validate :grade_format
+  validates :purpose, :methods, :background, :comments, length: { maximum: 1200 }
+  validates :n_collaborators, allow_blank: true,
+            numericality: { greater_than_or_equal_to: 0 }
+  validates :collaborators, length: { maximum: 1200 },
+            if: 'n_collaborators && n_collaborators > 0'
 
-  mount_uploader :image_url, ImageUploader
+  before_create :set_deadline
+
+  def set_deadline
+    self.deadline = Date.today
+  end
+
+  def has_collaborators?
+    n_collaborators && n_collaborators > 0
+  end
+
+  def has_comments?
+    comments
+  end
 
   def submit_and_destroy
     if transfer_attributes_to_new_grant
-      UserMailer.grant_submitted(self).deliver
-      Admin.all.each do |admin|
-        UserMailer.admin_grantsubmitted(self, admin).deliver
+      GrantSubmittedJob.new.async.perform(self)
+      admins = Admin.all + SuperUser.all
+      admins.each do |admin|
+        AdminGrantsubmittedJob.new.async.perform(self, admin)
       end
       destroy
     end
   end
 
   private
+    ATTRS_TO_COPY = ['subject_areas', 'funds_will_pay_for', 'image']
     def transfer_attributes_to_new_grant
-      grant = Grant.new
-      valid_attributes = Grant.accessible_attributes.reject &:empty?
-      grant.attributes = attributes.slice *valid_attributes
-      grant.recipient_id = recipient_id
-      grant.school_id = school_id
-      grant.save
+      temp = dup.becomes Grant
+      ATTRS_TO_COPY.map { |a| temp.send("#{a}=", attributes[a]) }
+      temp.type = nil
+
+      if temp.valid? then temp.save else get_errors_and_destroy(temp) end
+    end
+
+    def get_errors_and_destroy(temp)
+      temp.errors.messages.each { |attr, e| errors.add(attr, e[0]) }
+      false
     end
 end
